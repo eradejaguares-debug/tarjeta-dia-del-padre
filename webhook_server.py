@@ -40,7 +40,6 @@ promo, lo ideal es desplegarlo en un servicio como Render o Railway (plan gratui
 import os
 import json
 import textwrap
-import urllib.request
 from io import BytesIO
 
 import requests
@@ -135,8 +134,9 @@ def dibujar_texto_centrado(draw, lineas, fuente, caja, color):
 
 def pegar_foto_circular(imagen_base, foto_url):
     try:
-        with urllib.request.urlopen(foto_url, timeout=10) as resp:
-            datos_foto = resp.read()
+        resp = requests.get(foto_url, timeout=10)
+        resp.raise_for_status()
+        datos_foto = resp.content
         foto = Image.open(BytesIO(datos_foto)).convert("RGB")
     except Exception as e:
         print(f"  [aviso] no se pudo descargar la foto: {e}")
