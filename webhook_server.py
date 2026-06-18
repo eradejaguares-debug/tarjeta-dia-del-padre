@@ -44,12 +44,15 @@ import textwrap
 from io import BytesIO
 
 import requests
-from flask import Flask, request, render_template_string, abort, send_file
+from flask import Flask, request, render_template_string, abort, send_file, session, redirect, url_for
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "pauletti-secret-2026")
 
 JOTFORM_API_KEY = os.environ.get("JOTFORM_API_KEY", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "pauletti")
+FORM_ID = "261683194740058"
 DATA_FILE = "submissions.json"
 OUTPUT_DIR = "tarjetas_generadas"
 TEMPLATES_DIR = "templates"
@@ -507,6 +510,157 @@ def aprobar(submission_id):
     db[submission_id]["aprobada"] = True
     guardar_db(db)
     return ver_tarjeta(submission_id)
+
+
+PAGINA_LOGIN = """
+<!doctype html><html lang="es">
+<head><meta charset="utf-8"><title>Admin – Pauletti</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: sans-serif; background: #faf7f2; display: flex;
+         justify-content: center; align-items: center; height: 100vh; margin: 0; }
+  .box { background: white; padding: 40px; border-radius: 12px;
+         box-shadow: 0 4px 16px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+  input { width: 100%; padding: 10px; margin: 16px 0 8px; border: 1px solid #ccc;
+          border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+  button { width: 100%; padding: 12px; background: #1a7a3c; color: white;
+           border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+  .error { color: red; font-size: 14px; }
+</style></head>
+<body><div class="box">
+  <h2>Panel Pauletti</h2>
+  {% if error %}<p class="error">Contraseña incorrecta</p>{% endif %}
+  <form method="post">
+    <input type="password" name="password" placeholder="Contraseña" autofocus>
+    <button type="submit">Entrar</button>
+  </form>
+</div></body></html>
+"""
+
+PAGINA_ADMIN = """
+<!doctype html><html lang="es">
+<head><meta charset="utf-8"><title>Admin – Tarjetas Día del Padre</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: sans-serif; background: #faf7f2; padding: 20px; margin: 0; }
+  h1 { color: #333; }
+  .stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat { background: white; border-radius: 10px; padding: 16px 24px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; }
+  .stat .num { font-size: 32px; font-weight: bold; color: #1a7a3c; }
+  .stat .label { font-size: 13px; color: #888; }
+  table { width: 100%; border-collapse: collapse; background: white;
+          border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  th { background: #1a7a3c; color: white; padding: 12px 16px; text-align: left; font-size: 14px; }
+  td { padding: 12px 16px; border-bottom: 1px solid #f0ece4; font-size: 14px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fdf9f2; }
+  .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+  .confirmada { background: #d4edda; color: #155724; }
+  .pendiente  { background: #fff3cd; color: #856404; }
+  a.btn { padding: 6px 14px; border-radius: 6px; text-decoration: none; font-size: 13px;
+          background: #1a7a3c; color: white; display: inline-block; }
+  a.btn-dl { background: #555; }
+  .logout { float: right; font-size: 13px; color: #888; text-decoration: none; }
+</style></head>
+<body>
+  <a class="logout" href="/admin/logout">Cerrar sesión</a>
+  <h1>Tarjetas Día del Padre</h1>
+  <div class="stats">
+    <div class="stat"><div class="num">{{ total }}</div><div class="label">Total envíos</div></div>
+    <div class="stat"><div class="num">{{ confirmadas }}</div><div class="label">Confirmadas</div></div>
+    <div class="stat"><div class="num">{{ pendientes }}</div><div class="label">Pendientes</div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Nombre</th><th>WhatsApp</th><th>Estilo</th>
+      <th>Estado</th><th>Tarjeta</th><th>Descargar</th>
+    </tr></thead>
+    <tbody>
+    {% for s in submissions %}
+    <tr>
+      <td>{{ s.nombre }}</td>
+      <td>{{ s.whatsapp }}</td>
+      <td>{{ s.estilo }}</td>
+      <td><span class="badge {{ 'confirmada' if s.aprobada else 'pendiente' }}">
+        {{ '✓ Confirmada' if s.aprobada else 'Pendiente' }}
+      </span></td>
+      <td><a class="btn" href="/tarjeta/{{ s.id }}" target="_blank">Ver</a></td>
+      <td><a class="btn btn-dl" href="/imagen/{{ s.id }}" download>↓ PNG</a></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" style="text-align:center;color:#aaa;padding:32px">
+      Todavía no hay envíos.
+    </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body></html>
+"""
+
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if request.method == "POST":
+        if request.form.get("password") == ADMIN_PASSWORD:
+            session["admin"] = True
+            return redirect(url_for("admin"))
+        return render_template_string(PAGINA_LOGIN, error=True)
+
+    if not session.get("admin"):
+        return render_template_string(PAGINA_LOGIN, error=False)
+
+    # Traer todos los submissions de Jotform
+    try:
+        resp = requests.get(
+            f"https://api.jotform.com/form/{FORM_ID}/submissions",
+            params={"apiKey": JOTFORM_API_KEY, "limit": 200, "orderby": "created_at", "direction": "DESC"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        raw = resp.json().get("content", [])
+    except Exception as e:
+        print(f"Error trayendo submissions: {e}")
+        raw = []
+
+    db = leer_db()
+    submissions = []
+    for item in raw:
+        sid = item.get("id", "")
+        answers = item.get("answers", {})
+        por_etiqueta = {}
+        for v in answers.values():
+            etiqueta = (v.get("text") or "").strip()
+            valor = v.get("answer", "")
+            if isinstance(valor, dict):
+                valor = valor.get("full", "") or valor.get("url", "") or ""
+            if isinstance(valor, list):
+                valor = valor[0] if valor else ""
+            por_etiqueta[etiqueta] = str(valor)
+
+        registro = db.get(sid, {})
+        submissions.append({
+            "id": sid,
+            "nombre": por_etiqueta.get("Nombre", "—"),
+            "whatsapp": por_etiqueta.get("WhatsApp", "—"),
+            "estilo": por_etiqueta.get("¿Qué estilo de tarjeta querés para tu papá?", "—"),
+            "aprobada": registro.get("aprobada", False),
+        })
+
+    confirmadas = sum(1 for s in submissions if s["aprobada"])
+    return render_template_string(
+        PAGINA_ADMIN,
+        submissions=submissions,
+        total=len(submissions),
+        confirmadas=confirmadas,
+        pendientes=len(submissions) - confirmadas,
+    )
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin", None)
+    return redirect(url_for("admin"))
 
 
 if __name__ == "__main__":
