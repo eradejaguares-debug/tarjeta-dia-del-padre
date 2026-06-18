@@ -203,7 +203,7 @@ FONT_SIZE_MAX = 64
 FONT_SIZE_MIN = 28
 SIGNATURE_BOX = (120, 1180, 1080, 1260)
 SIGNATURE_FONT_PATH = "Fonts/NothingYouCouldDo-Regular.ttf"
-SIGNATURE_FONT_SIZE = 48
+SIGNATURE_FONT_SIZE = 72
 PHOTO_CENTER = (600, 380)
 PHOTO_RADIUS = 220
 FALLBACK_BG_COLOR = {
@@ -219,7 +219,6 @@ FALLBACK_BG_COLOR = {
 LABELS = {
     "nombre": "Nombre",
     "whatsapp": "WhatsApp",
-    "pedido": "Número de pedido",
     "confirmacion": "Confirmo que ya reservé mi pedido por WhatsApp y que supera los $22.000.",
     "frase_elegida": "Elegí la frase que más se parece a tu papá",
     "frase_propia": "Escribí tu frase para la tarjeta",
@@ -338,7 +337,7 @@ def generar_imagen(datos, submission_id):
     dibujar_texto_centrado(draw, lineas, fuente, TEXT_BOX, TEXT_COLOR)
 
     if hijos:
-        firma = f"Con cariño, {hijos}"
+        firma = hijos
         fuente_firma = cargar_fuente(SIGNATURE_FONT_SIZE, ruta=SIGNATURE_FONT_PATH)
         dibujar_texto_centrado(draw, [firma], fuente_firma, SIGNATURE_BOX, TEXT_COLOR)
 
@@ -433,20 +432,30 @@ PAGINA_TARJETA = """
 <head><meta charset="utf-8"><title>Tu tarjeta para Papá</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body { font-family: sans-serif; text-align: center; background:#faf7f2; padding: 20px; }
-  img { max-width: 360px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-  button { font-size: 18px; padding: 12px 28px; margin-top: 20px; border-radius: 8px; border: none; background:#1a7a3c; color: white; cursor:pointer; }
+  body { font-family: sans-serif; text-align: center; background:#faf7f2; padding: 20px; margin: 0; }
+  img { max-width: 360px; width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+  .botones { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 24px; }
+  .btn-confirmar { font-size: 18px; padding: 14px 32px; border-radius: 8px; border: none;
+                   background: #1a7a3c; color: white; cursor: pointer; width: 260px; }
+  .btn-editar { font-size: 16px; padding: 12px 32px; border-radius: 8px; border: 2px solid #888;
+                background: transparent; color: #555; cursor: pointer; text-decoration: none;
+                display: inline-block; width: 260px; box-sizing: border-box; }
+  .confirmado { font-size: 18px; color: #1a7a3c; margin-top: 20px; font-weight: bold; }
 </style></head>
 <body>
   <h2>Así quedó tu tarjeta</h2>
   <img src="/imagen/{{ submission_id }}" alt="Tarjeta para papá">
-  <br>
   {% if aprobada %}
-    <p>Gracias, ya quedó confirmada.</p>
+    <p class="confirmado">¡Tarjeta confirmada! Muchas gracias.</p>
   {% else %}
+  <div class="botones">
     <form method="post" action="/tarjeta/{{ submission_id }}/aprobar">
-      <button type="submit">Confirmar esta tarjeta</button>
+      <button class="btn-confirmar" type="submit">Confirmar esta tarjeta</button>
     </form>
+    <a class="btn-editar" href="https://www.jotform.com/edit/{{ submission_id }}">
+      Editar mis respuestas
+    </a>
+  </div>
   {% endif %}
 </body></html>
 """
