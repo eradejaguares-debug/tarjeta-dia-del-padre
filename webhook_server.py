@@ -263,7 +263,9 @@ def ajustar_texto_a_caja(texto, caja, tamano_max, tamano_min):
 
 def dibujar_texto_centrado(draw, lineas, fuente, caja, color):
     ancho_caja = caja[2] - caja[0]
-    alto_linea = fuente.size + 10
+    # Medir altura real de línea con la fuente cargada
+    bbox_muestra = fuente.getbbox("Ag")
+    alto_linea = (bbox_muestra[3] - bbox_muestra[1]) + 14
     alto_total = len(lineas) * alto_linea
     y = caja[1] + (caja[3] - caja[1] - alto_total) // 2
     for linea in lineas:
@@ -275,7 +277,9 @@ def dibujar_texto_centrado(draw, lineas, fuente, caja, color):
 
 def pegar_foto_circular(imagen_base, foto_url):
     try:
-        resp = requests.get(foto_url, timeout=10)
+        # Jotform requiere la API key para descargar archivos adjuntos
+        url = foto_url if "apiKey" in foto_url else f"{foto_url}?apiKey={JOTFORM_API_KEY}"
+        resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         datos_foto = resp.content
         foto = Image.open(BytesIO(datos_foto)).convert("RGB")
