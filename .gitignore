@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.env
+.env
+
+# Virtual environments
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output files (tarjetas generadas)
+*.png
+*.jpg
