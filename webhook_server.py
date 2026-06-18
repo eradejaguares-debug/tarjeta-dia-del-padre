@@ -311,8 +311,28 @@ PAGINA_TARJETA = """
 def ver_tarjeta(submission_id):
     db = leer_db()
     registro = db.get(submission_id)
-    if not registro:
-        abort(404)
+
+    # Si no está en la DB o la imagen se perdió (filesystem efímero de Render),
+    # la regeneramos on-demand desde la API de Jotform.
+    if not registro or not os.path.exists(registro.get("imagen", "")):
+        try:
+            datos = obtener_datos_de_submission(submission_id)
+            ruta_imagen = generar_imagen(datos, submission_id)
+        except Exception as e:
+            print(f"Error regenerando tarjeta {submission_id}: {e}")
+            abort(404)
+        aprobada = registro.get("aprobada", False) if registro else False
+        db[submission_id] = {
+            "nombre": datos.get("nombre", ""),
+            "whatsapp": datos.get("whatsapp", ""),
+            "pedido": datos.get("pedido", ""),
+            "confirmacion": datos.get("confirmacion", ""),
+            "imagen": ruta_imagen,
+            "aprobada": aprobada,
+        }
+        guardar_db(db)
+        registro = db[submission_id]
+
     return render_template_string(PAGINA_TARJETA, submission_id=submission_id, aprobada=registro["aprobada"])
 
 
