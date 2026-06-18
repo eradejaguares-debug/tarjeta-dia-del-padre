@@ -39,6 +39,7 @@ promo, lo ideal es desplegarlo en un servicio como Render o Railway (plan gratui
 
 import os
 import json
+import random
 import textwrap
 from io import BytesIO
 
@@ -52,6 +53,146 @@ JOTFORM_API_KEY = os.environ.get("JOTFORM_API_KEY", "")
 DATA_FILE = "submissions.json"
 OUTPUT_DIR = "tarjetas_generadas"
 TEMPLATES_DIR = "templates"
+
+
+# ---------------------------------------------------------------------
+# Generación de fondos (se ejecuta al arrancar si no existen los PNG)
+# ---------------------------------------------------------------------
+
+def _gradiente(draw, top, bot, w=1200, h=1800):
+    for y in range(h):
+        t = y / h
+        r = int(top[0] + (bot[0] - top[0]) * t)
+        g = int(top[1] + (bot[1] - top[1]) * t)
+        b = int(top[2] + (bot[2] - top[2]) * t)
+        draw.line([(0, y), (w, y)], fill=(r, g, b))
+
+
+def _borde(draw, color, ge=18, gi=6, m=40):
+    draw.rectangle([m, m, 1200-m, 1800-m], outline=color, width=ge)
+    m2 = m + ge + 10
+    draw.rectangle([m2, m2, 1200-m2, 1800-m2], outline=color, width=gi)
+
+
+def _esquinas(draw, color, m=60, largo=80, g=6):
+    for pts in [
+        [(m, m+largo), (m, m), (m+largo, m)],
+        [(1200-m-largo, m), (1200-m, m), (1200-m, m+largo)],
+        [(m, 1800-m-largo), (m, 1800-m), (m+largo, 1800-m)],
+        [(1200-m-largo, 1800-m), (1200-m, 1800-m), (1200-m, 1800-m-largo)],
+    ]:
+        draw.line(pts, fill=color, width=g)
+
+
+def _sep(draw, color, y=620, m=120):
+    draw.line([(m, y), (1200-m, y)], fill=color, width=3)
+    draw.ellipse([600-6, y-6, 600+6, y+6], fill=color)
+
+
+def _circulo(draw, color, alpha=70):
+    cx, cy, r = 600, 380, 230
+    for i in range(3, 0, -1):
+        draw.ellipse([cx-r-i*8, cy-r-i*8, cx+r+i*8, cy+r+i*8],
+                     outline=color + (alpha,), width=4)
+
+
+def generar_fondos_si_faltan():
+    os.makedirs(TEMPLATES_DIR, exist_ok=True)
+    W, H = 1200, 1800
+
+    # Clásico
+    p = os.path.join(TEMPLATES_DIR, "clasico.png")
+    if not os.path.exists(p):
+        img = Image.new("RGB", (W, H))
+        d = ImageDraw.Draw(img, "RGBA")
+        _gradiente(d, (252, 248, 238), (240, 230, 210))
+        for i in range(0, W+H, 30):
+            d.line([(i, 0), (0, i)], fill=(200, 190, 170, 18), width=1)
+        _borde(d, (180, 155, 110))
+        _esquinas(d, (160, 135, 90))
+        _sep(d, (180, 155, 110))
+        _circulo(d, (180, 155, 110))
+        img.save(p)
+
+    # Elegante
+    p = os.path.join(TEMPLATES_DIR, "elegante.png")
+    if not os.path.exists(p):
+        img = Image.new("RGB", (W, H))
+        d = ImageDraw.Draw(img, "RGBA")
+        _gradiente(d, (18, 18, 28), (8, 8, 18))
+        for x in range(0, W, 60):
+            for y in range(0, H, 60):
+                d.ellipse([x-1, y-1, x+1, y+1], fill=(180, 150, 80, 35))
+        _borde(d, (200, 170, 90), ge=14, gi=4)
+        _esquinas(d, (210, 180, 100), largo=100, g=5)
+        _sep(d, (200, 170, 90))
+        _sep(d, (200, 170, 90), y=1300)
+        _circulo(d, (200, 170, 90), alpha=90)
+        img.save(p)
+
+    # Divertido
+    p = os.path.join(TEMPLATES_DIR, "divertido.png")
+    if not os.path.exists(p):
+        img = Image.new("RGB", (W, H))
+        d = ImageDraw.Draw(img, "RGBA")
+        _gradiente(d, (255, 220, 60), (255, 175, 30))
+        rng = random.Random(42)
+        colores = [(255,100,50), (80,180,120), (60,130,220), (220,60,120), (255,255,255)]
+        for _ in range(120):
+            x, y = rng.randint(0, W), rng.randint(0, H)
+            sz = rng.randint(12, 35)
+            col = rng.choice(colores) + (110,)
+            if rng.random() > 0.5:
+                d.rectangle([x, y, x+sz, y+sz], fill=col)
+            else:
+                d.ellipse([x, y, x+sz, y+sz], fill=col)
+        _borde(d, (200, 80, 30), ge=20, gi=8)
+        _esquinas(d, (200, 80, 30), largo=90, g=8)
+        _sep(d, (200, 80, 30))
+        _circulo(d, (255, 255, 255))
+        img.save(p)
+
+    # Futbolero
+    p = os.path.join(TEMPLATES_DIR, "futbolero.png")
+    if not os.path.exists(p):
+        img = Image.new("RGB", (W, H))
+        d = ImageDraw.Draw(img, "RGBA")
+        _gradiente(d, (20, 100, 40), (10, 70, 25))
+        d.line([(0, H//2), (W, H//2)], fill=(255, 255, 255, 25), width=3)
+        d.ellipse([W//2-150, H//2-150, W//2+150, H//2+150],
+                  outline=(255, 255, 255, 25), width=3)
+        d.rectangle([0, 0, 45, H], fill=(180, 20, 20, 190))
+        d.rectangle([W-45, 0, W, H], fill=(180, 20, 20, 190))
+        _borde(d, (255, 255, 255), ge=16, gi=5)
+        _esquinas(d, (255, 220, 0), largo=90, g=7)
+        _sep(d, (255, 255, 255))
+        _circulo(d, (255, 255, 255))
+        img.save(p)
+
+    # Abuelo
+    p = os.path.join(TEMPLATES_DIR, "abuelo.png")
+    if not os.path.exists(p):
+        img = Image.new("RGB", (W, H))
+        d = ImageDraw.Draw(img, "RGBA")
+        _gradiente(d, (245, 232, 210), (225, 208, 180))
+        rng = random.Random(7)
+        for _ in range(6000):
+            x, y = rng.randint(0, W-1), rng.randint(0, H-1)
+            v = rng.randint(155, 195)
+            d.point((x, y), fill=(v, v-10, v-20, 28))
+        for _ in range(8):
+            x, y = rng.randint(100, W-100), rng.randint(100, H-100)
+            sz = rng.randint(80, 200)
+            d.ellipse([x, y, x+sz, y+sz], fill=(200, 175, 140, 15))
+        _borde(d, (140, 105, 65), ge=20, gi=7)
+        _esquinas(d, (120, 85, 45), largo=100, g=7)
+        _sep(d, (140, 105, 65))
+        _sep(d, (140, 105, 65), y=1310)
+        _circulo(d, (140, 105, 65))
+        img.save(p)
+
+
+generar_fondos_si_faltan()
 
 # ---- Mismo bloque de configuración visual que generar_tarjetas.py ----
 CANVAS_SIZE = (1200, 1800)
